@@ -1,0 +1,13 @@
+{
+  "local": {
+    "url": "http://127.0.0.1:49374",
+    "token": "<local session token>"
+  },
+  "hub": {
+    "url": "http://hub.example:49374",
+    "token": "<hub session token>"
+  },
+  "directories": {
+    "/home/me/code/project": "/home/hubuser/code/project"
+  }
+}
