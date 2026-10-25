@@ -42,9 +42,11 @@ def run_once(local: OpenCodeClient, hub: OpenCodeClient, config: Config, dry_run
     push_dir = config.directories
     pull_dir = {target: source for target, source in config.directories.items()}
 
-    synced = plan.entries
-    synced.update(_rev_pair(copy(local, hub, local_sessions, hub_sessions, plan.push, push_dir)))
-    synced.update(_rev_pair(copy(hub, local, hub_sessions, local_sessions, plan.pull, pull_dir)))
+    synced = dict(plan.entries)
+    push_synced = copy(local, hub, local_sessions, hub_sessions, plan.push, push_dir)
+    synced.update({sid: {'local': s, 'hub': t} for sid, (s, t) in push_synced.items()})
+    pull_synced = copy(hub, local, hub_sessions, local_sessions, plan.pull, pull_dir)
+    synced.update({sid: {'local': t, 'hub': s} for sid, (s, t) in pull_synced.items()})
 
     save_state(config.state_path, synced)
 
@@ -64,12 +66,30 @@ def build_plan(local: dict, hub: dict, state: dict, active: dict) -> Plan:
         local_updated = local_session['time']['updated'] if local_session else None
         hub_updated = hub_session['time']['updated'] if hub_session else None
         known = state.get(sid, {})
+        known_local = known.get('local')
+        known_hub = known.get('hub')
 
         if local_session and hub_session:
-            if local_updated == hub_updated:
-                entries[sid] = {'local': local_updated, 'hub': hub_updated}
-            elif known.get('local') is not None and known.get('hub') is not None and local_updated > known['local'] and hub_updated > known['hub']:
-                conflicts.add(sid)
+            if known_local is not None and known_hub is not None:
+                local_changed = local_updated > known_local
+                hub_changed = hub_updated > known_hub
+
+                if local_changed and hub_changed:
+                    conflicts.add(sid)
+                    entries[sid] = known
+                elif local_changed:
+                    if sid in busy:
+                        entries[sid] = known
+                    else:
+                        push.add(sid)
+                elif hub_changed:
+                    if sid in busy:
+                        entries[sid] = known
+                    else:
+                        pull.add(sid)
+                else:
+                    entries[sid] = {'local': local_updated, 'hub': hub_updated}
+            elif local_updated == hub_updated:
                 entries[sid] = {'local': local_updated, 'hub': hub_updated}
             elif sid in busy:
                 entries[sid] = {'local': local_updated, 'hub': hub_updated}
@@ -112,8 +132,8 @@ def expand_cascades(plan: Plan, local: dict, hub: dict, active: dict) -> None:
     _expand(plan.pull, local, hub, 'hub', 'local', active)
 
 
-def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, target_sessions: dict, session_ids: set, directory_map: dict) -> dict:
-    synced: dict = {}
+def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, target_sessions: dict, session_ids: set, directory_map: dict) -> dict[str, tuple[int, int]]:
+    synced: dict[str, tuple[int, int]] = {}
     target_children = _map_children(target_sessions)
     cascaded_away: set = set()
 
@@ -129,9 +149,11 @@ def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, 
             cascaded_away |= doomed
 
         directory = directory_map.get(info['location']['directory'])
-        target.import_session(snapshot, directory)
+        imported = target.import_session(snapshot, directory)
 
-        synced[sid] = info['time']['updated']
+        source_updated = info['time']['updated']
+        target_updated = imported['time']['updated']
+        synced[sid] = (source_updated, target_updated)
 
     return synced
 
@@ -147,10 +169,6 @@ def _expand(to_copy: set, target: dict, source: dict, source_side: str, target_s
                 log.warning('%s is a child of replaced session %s only on %s side; it will be lost', child, sid, target_side)
             elif child not in active[source_side]:
                 to_copy.add(child)
-
-
-def _rev_pair(synced: dict) -> dict:
-    return {sid: {'local': updated, 'hub': updated} for sid, updated in synced.items()}  # after a successful copy both sides hold the same revision.
 
 
 def _map_children(sessions: dict) -> dict:  # parent id -> [children ids]

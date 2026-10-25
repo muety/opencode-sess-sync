@@ -30,11 +30,11 @@ class OpenCodeClient:
     def export_session(self, session_id: str) -> dict:
         return self._get(f'/api/experimental/session/{session_id}/export').json()['data']
 
-    def import_session(self, snapshot: dict, directory: str | None = None) -> None:
+    def import_session(self, snapshot: dict, directory: str | None = None) -> dict:
         body: dict = {'info': snapshot['info'], 'messages': snapshot['messages']}
         if directory:
             body['location'] = {'directory': directory}
-        self._request('POST', '/api/experimental/session/import', json=body)
+        return self._request('POST', '/api/experimental/session/import', json=body).json()['data']
 
     def delete_session(self, session_id: str) -> None:
         response = self._http.delete(f'/api/session/{session_id}')
