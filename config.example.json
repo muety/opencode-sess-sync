@@ -4,7 +4,7 @@
     "token": "<local session token>"
   },
   "hub": {
-    "url": "http://hub.example:49374",
+    "url": "https://hub.example:49374",
     "token": "<hub session token>"
   },
   "directories": {

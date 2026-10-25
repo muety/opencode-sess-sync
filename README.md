@@ -1,6 +1,6 @@
 # opencode-sess-sync
 
-Replicate OpenCode sessions between a local instance and a remote "hub" instance (-> "star" topology of potentially multiple "clients" and a central instance they all sync against) over the [v2 HTTP API](https://opencode.ai/v2/docs/api). Whole sessions are synced via export / import. Latest session (by `time.updated`) wins and deletions propagate as well. Deletions propagate, child sessions follow their parents. 
+Replicate OpenCode sessions between a local instance and a remote "hub" instance (-> "star" topology of potentially multiple "clients" and a central instance they all sync against) over the [v2 HTTP API](https://opencode.ai/v2/docs/api). Whole sessions are synced via export / import. Latest session (by `time.updated`) wins and deletions propagate as well.
 
 **Assumption:** a session is only ever edited on one machine at a time (i.e. we don't _merge_ individual sessions).
 
@@ -13,7 +13,7 @@ Written with AI assistance 🤖.
     - Remote hub will be accessible publicly, so either expose the port in the firewall, use a reverse proxy (like Caddy or such) or a VPN like Tailscale
 - Python >= 3.12
 - [uv](https://docs.astral.sh/uv/)
-- 
+
 ## Setup
 
 ```bash
@@ -29,7 +29,7 @@ opencode api post /api/pair
 
 ```bash
 curl -H 'Accept: application/json' http://127.0.0.1:49374/auth/connect/<local code>  # connect to local API
-curl -H 'Accept: application/json' http://hub.example:49374/auth/connect/<hub code>  # connect to remote hub API
+curl -H 'Accept: application/json' https://hub.example:49374/auth/connect/<hub code>  # connect to remote hub API
 ```
 
 The token is then used as the HTTP basic-auth password (username `opencode`, or `OPENCODE_SERVER_USERNAME` if set on the server).
@@ -40,7 +40,7 @@ Create `~/.config/opencode-sess-sync/config.json` from `config.example.json`.
 ```json
 {
   "local": { "url": "http://127.0.0.1:49374", "token": "<local token>" },
-  "hub": { "url": "http://hub.example:49374", "token": "<hub token>" }
+  "hub": { "url": "https://hub.example:49374", "token": "<hub token>" }
 }
 ```
 
@@ -67,4 +67,9 @@ A failing run just exits non-zero (or retries on the next tick in `--daemon` mod
 ### Code formatting
 ```bash
 uv run ruff check --fix && uv run ruff format .
+```
+
+### Purge session database
+```bash
+rm ~/.local/share/opencode/opencode.db*
 ```

@@ -23,6 +23,7 @@ def main() -> None:
     log = logging.getLogger('opencode-sess-sync')
 
     config = load_config(args.config)
+
     local = OpenCodeClient(config.local_url, config.local_token)
     hub = OpenCodeClient(config.hub_url, config.hub_token)
 
