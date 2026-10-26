@@ -8,6 +8,7 @@
     "token": "<hub session token>"
   },
   "directories": {
-    "/home/me/code/project": "/home/hubuser/code/project"
+    "/home/me/code/*": "/home/hubuser/code/*",
+    "/home/me/plain/project": "/home/hubuser/plain/project"
   }
 }

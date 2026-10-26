@@ -2,6 +2,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from directories import DirectoryMap
+
 DEFAULT_CONFIG_PATH = Path.home() / '.config' / 'opencode-sess-sync' / 'config.json'
 
 
@@ -12,7 +14,7 @@ class Config:
     local_token: str | None
     hub_token: str | None
     state_path: Path
-    directories: dict[str, str]
+    directories: DirectoryMap
 
 
 def load_config(path: str) -> Config:
@@ -24,5 +26,5 @@ def load_config(path: str) -> Config:
         local_token=data['local'].get('token'),
         hub_token=data['hub'].get('token'),
         state_path=Path(data.get('state', path.parent / 'state.json')).expanduser(),
-        directories=data.get('directories', {}),
+        directories=DirectoryMap.parse(data.get('directories', {})),
     )

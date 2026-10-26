@@ -15,12 +15,15 @@ def main() -> None:
     parser.add_argument('--config', default=str(DEFAULT_CONFIG_PATH))
     parser.add_argument('--dry-run', action='store_true', help='print the plan without applying it')
     parser.add_argument('--daemon', action='store_true', help='keep running and reconcile every --interval seconds')
+    parser.add_argument('-v', '--verbose', action='store_true', help='debug logging (shows per-session directory mapping)')
     parser.add_argument('--interval', type=float, default=300)
     args = parser.parse_args()
 
     logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=logging.INFO)
-    logging.getLogger('httpx2').setLevel(logging.WARNING)  # drop per-request 'HTTP Request: ...' lines
+    logging.getLogger('httpx2').setLevel(logging.WARNING)
     log = logging.getLogger('opencode-sess-sync')
+    if args.verbose:
+        log.setLevel(logging.DEBUG)
 
     config = load_config(args.config)
 

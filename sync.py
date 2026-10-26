@@ -1,4 +1,6 @@
 import logging
+from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from client import OpenCodeClient
@@ -30,6 +32,8 @@ def run_once(local: OpenCodeClient, hub: OpenCodeClient, config: Config, dry_run
     plan = build_plan(local_sessions, hub_sessions, state, active)
     expand_cascades(plan, local_sessions, hub_sessions, active)
     _log_plan(plan)
+    _log_remaps('push', plan.push, local_sessions, config.directories.to_hub)
+    _log_remaps('pull', plan.pull, hub_sessions, config.directories.to_local)
 
     if dry_run:
         return
@@ -39,13 +43,10 @@ def run_once(local: OpenCodeClient, hub: OpenCodeClient, config: Config, dry_run
     for sid in plan.delete_local:
         local.delete_session(sid)
 
-    push_dir = config.directories
-    pull_dir = {target: source for target, source in config.directories.items()}
-
     synced = dict(plan.entries)
-    push_synced = copy(local, hub, local_sessions, hub_sessions, plan.push, push_dir)
+    push_synced = copy(local, hub, local_sessions, hub_sessions, plan.push, config.directories.to_hub)
     synced.update({sid: {'local': s, 'hub': t} for sid, (s, t) in push_synced.items()})
-    pull_synced = copy(hub, local, hub_sessions, local_sessions, plan.pull, pull_dir)
+    pull_synced = copy(hub, local, hub_sessions, local_sessions, plan.pull, config.directories.to_local)
     synced.update({sid: {'local': t, 'hub': s} for sid, (s, t) in pull_synced.items()})
 
     save_state(config.state_path, synced)
@@ -132,7 +133,7 @@ def expand_cascades(plan: Plan, local: dict, hub: dict, active: dict) -> None:
     _expand(plan.pull, local, hub, 'hub', 'local', active)
 
 
-def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, target_sessions: dict, session_ids: set, directory_map: dict) -> dict[str, tuple[int, int]]:
+def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, target_sessions: dict, session_ids: set, resolve_directory: Callable[[str], str | None]) -> dict[str, tuple[int, int]]:
     synced: dict[str, tuple[int, int]] = {}
     target_children = _map_children(target_sessions)
     cascaded_away: set = set()
@@ -148,7 +149,7 @@ def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, 
                 target.delete_session(doomed_sid)
             cascaded_away |= doomed
 
-        directory = directory_map.get(info['location']['directory'])
+        directory = resolve_directory(info['location']['directory'])
         imported = target.import_session(snapshot, directory)
 
         source_updated = info['time']['updated']
@@ -212,3 +213,16 @@ def _log_plan(plan: Plan) -> None:
     for name, sids in (('push', plan.push), ('pull', plan.pull), ('delete_hub', plan.delete_hub), ('delete_local', plan.delete_local)):
         if sids:
             log.debug('%s: %s', name, sorted(sids))
+
+
+def _log_remaps(direction: str, sids: set, sessions: dict, resolve_directory: Callable[[str], str | None]) -> None:
+    remaps: Counter[tuple[str, str]] = Counter()
+    for sid in sids:
+        directory = (sessions[sid].get('location') or {}).get('directory')
+        target = resolve_directory(directory) if directory else None
+        if target:
+            remaps[directory, target] += 1
+    for (directory, target), count in sorted(remaps.items()):
+        log.debug('%s: %d session(s) %s -> %s', direction, count, directory, target)
+    if sids:
+        log.debug('%s: %d of %d sessions remapped, %d use the target default directory', direction, remaps.total(), len(sids), len(sids) - remaps.total())

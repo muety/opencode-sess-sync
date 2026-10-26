@@ -48,8 +48,19 @@ Create `~/.config/opencode-sess-sync/config.json` from `config.example.json`.
 If the same project lives at different paths on the two machines, map them (local path -> hub path). Omit it if your paths match — sessions then land in the target server's default location.
 
 ```json
-"directories": { "/home/me/code/foo": "/home/hubuser/code/foo" }
+"directories": {
+  "/home/me/code/*": "/home/hubuser/code/*",
+  "/home/me/scratch/**": "/home/hubuser/scratch/**",
+  "/home/me/plain/project": "/home/hubuser/plain/project"
+}
 ```
+
+- Mappings apply in both directions: pushed sessions use local -> hub, pulled sessions hub -> local
+- A path without wildcards matches that exact directory only (not its subdirectories)
+- `*` as a whole path segment matches exactly one segment, `**` matches one or more (at most one `**` per path) -> both sides must use the same wildcards in the same order
+- The first matching rule (in file order) wins
+- Unmapped directories fall back to the target server's default location
+- Run with `--dry-run -v` to see how each session resolves
 
 Sync state (used to detect deletions) is written to `state.json` next to the config.
 
@@ -64,6 +75,11 @@ uv run main.py --daemon --interval 60       # keep running
 A failing run just exits non-zero (or retries on the next tick in `--daemon` mode). The next run re-derives the full plan from both instances. Sessions that are actively running on either side are skipped until they go idle.
 
 ## Developer notes
+### Run tests
+```bash
+uv run pytest
+```
+
 ### Code formatting
 ```bash
 uv run ruff check --fix && uv run ruff format .
