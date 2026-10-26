@@ -44,9 +44,9 @@ def run_once(local: OpenCodeClient, hub: OpenCodeClient, config: Config, dry_run
         local.delete_session(sid)
 
     synced = dict(plan.entries)
-    push_synced = copy(local, hub, local_sessions, hub_sessions, plan.push, config.directories.to_hub)
+    push_synced = copy('push', local, hub, local_sessions, hub_sessions, plan.push, config.directories.to_hub)
     synced.update({sid: {'local': s, 'hub': t} for sid, (s, t) in push_synced.items()})
-    pull_synced = copy(hub, local, hub_sessions, local_sessions, plan.pull, config.directories.to_local)
+    pull_synced = copy('pull', hub, local, hub_sessions, local_sessions, plan.pull, config.directories.to_local)
     synced.update({sid: {'local': t, 'hub': s} for sid, (s, t) in pull_synced.items()})
 
     save_state(config.state_path, synced)
@@ -133,10 +133,11 @@ def expand_cascades(plan: Plan, local: dict, hub: dict, active: dict) -> None:
     _expand(plan.pull, local, hub, 'hub', 'local', active)
 
 
-def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, target_sessions: dict, session_ids: set, resolve_directory: Callable[[str], str | None]) -> dict[str, tuple[int, int]]:
+def copy(direction: str, source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, target_sessions: dict, session_ids: set, resolve_directory: Callable[[str], str | None]) -> dict[str, tuple[int, int]]:
     synced: dict[str, tuple[int, int]] = {}
     target_children = _map_children(target_sessions)
     cascaded_away: set = set()
+    directories_exist: dict[str, bool] = {}
 
     for sid in _sort_by_topology(source_sessions, session_ids):
         snapshot = source.export_session(sid)
@@ -149,7 +150,12 @@ def copy(source: OpenCodeClient, target: OpenCodeClient, source_sessions: dict, 
                 target.delete_session(doomed_sid)
             cascaded_away |= doomed
 
-        directory = resolve_directory(info['location']['directory'])
+        directory = resolve_directory(info['location']['directory']) or info['location']['directory']  # unmapped -> keep the source path
+        if directory not in directories_exist:
+            directories_exist[directory] = target.has_directory(directory)
+        if not directories_exist[directory]:
+            log.warning('%s: session %s (%s) is imported into %s, which does not exist on the target; it cannot be continued there until the directory exists', direction, sid, info.get('title') or 'untitled', directory)
+
         imported = target.import_session(snapshot, directory)
 
         source_updated = info['time']['updated']
@@ -225,4 +231,4 @@ def _log_remaps(direction: str, sids: set, sessions: dict, resolve_directory: Ca
     for (directory, target), count in sorted(remaps.items()):
         log.debug('%s: %d session(s) %s -> %s', direction, count, directory, target)
     if sids:
-        log.debug('%s: %d of %d sessions remapped, %d use the target default directory', direction, remaps.total(), len(sids), len(sids) - remaps.total())
+        log.debug('%s: %d of %d sessions remapped, %d keep source directory', direction, remaps.total(), len(sids), len(sids) - remaps.total())

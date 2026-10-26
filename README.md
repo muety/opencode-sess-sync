@@ -45,7 +45,7 @@ Create `~/.config/opencode-sess-sync/config.json` from `config.example.json`.
 ```
 
 ### Optional: map directory paths
-If the same project lives at different paths on the two machines, map them (local path -> hub path). Omit it if your paths match — sessions then land in the target server's default location.
+If the same project lives at different paths on the two machines, map them (local path -> hub path). Omit it entirely if your paths match — sessions then keep their source path on the target, regardless of whether it actually exists or not. That is, sessions with non-existing target path will become "dangling".
 
 ```json
 "directories": {
@@ -59,7 +59,7 @@ If the same project lives at different paths on the two machines, map them (loca
 - A path without wildcards matches that exact directory only (not its subdirectories)
 - `*` as a whole path segment matches exactly one segment, `**` matches one or more (at most one `**` per path) -> both sides must use the same wildcards in the same order
 - The first matching rule (in file order) wins
-- Unmapped directories fall back to the target server's default location
+- Unmapped directories are kept as-is (identity). If the path does not exist on the target, the session is imported anyway — it stays listed / exportable, but can't be continued until the directory exists
 - Run with `--dry-run -v` to see how each session resolves
 
 Sync state (used to detect deletions) is written to `state.json` next to the config.

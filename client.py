@@ -41,6 +41,13 @@ class OpenCodeClient:
         if response.status_code != 404:
             self._check(response)
 
+    def has_directory(self, directory: str) -> bool:
+        response = self._http.request('GET', '/api/fs/list', params={'location[directory]': directory})
+        if response.status_code == 404:
+            return False
+        self._check(response)
+        return True
+
     def close(self) -> None:
         self._http.close()
 
