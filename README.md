@@ -10,8 +10,8 @@ Written with AI assistance 🤖.
 
 - OpenCode 2.x, incl. REST API
     - Listening on `http://127.0.0.1:49374` by default, check `opencode service status`
-    - Remote hub will be accessible publicly, so either expose the port in the firewall, use a reverse proxy (like Caddy or such) or a VPN like Tailscale
-- Python >= 3.12
+    - Remote hub must be publicly accessible, so either expose the port in the firewall, use a reverse proxy (like Caddy or such) or a VPN like Tailscale
+- Python >= 3.14
 - [uv](https://docs.astral.sh/uv/)
 
 ## Setup
@@ -40,7 +40,8 @@ Create `~/.config/opencode-sess-sync/config.json` from `config.example.json`.
 ```json
 {
   "local": { "url": "http://127.0.0.1:49374", "token": "<local token>" },
-  "hub": { "url": "https://hub.example:49374", "token": "<hub token>" }
+  "hub": { "url": "https://hub.example:49374", "token": "<hub token>" },
+  "directories": {}
 }
 ```
 
