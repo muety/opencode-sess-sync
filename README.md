@@ -1,6 +1,6 @@
 # opencode-sess-sync
 
-Replicate OpenCode sessions between a local instance and a remote "hub" instance (-> "star" topology of potentially multiple "clients" and a central instance they all sync against) over the [v2 HTTP API](https://opencode.ai/v2/docs/api). Whole sessions are synced via export / import. Latest session (by `time.updated`) wins and deletions propagate as well.
+Replicate [OpenCode](https://opencode.ai) sessions between a local instance and a remote "hub" instance (-> "star" topology of potentially multiple "clients" and a central instance they all sync against) over the [v2 HTTP API](https://opencode.ai/v2/docs/api). Whole sessions are synced via export / import. Latest session (by `time.updated`) wins and deletions propagate as well.
 
 **Assumption:** a session is only ever edited on one machine at a time (i.e. we don't _merge_ individual sessions).
 
@@ -73,3 +73,12 @@ uv run ruff check --fix && uv run ruff format .
 ```bash
 rm ~/.local/share/opencode/opencode.db*
 ```
+
+## Alternatives
+During my research to find a soluton for syncing OpenCode sessions across machines (until implemented natively, see [#54534](https://github.com/anomalyco/opencode/issues/54534)), I considered a bunch of alternatives.
+
+The first draft was simply a bash script that would run on schedule to shut down the `opencode` service, run a [borg](https://www.borgbackup.org/) backup of the SQLite database (incl. incremental backupping, deduplication and compression) against a remote repo and afterwards restart the service again. While this worked in general, I suspected that I'd probably run into "mege conflicts" quite soon. Apart from that, it felt a quite "hacky" and dump.
+
+Second alternative that I considered was to use [LiteFS](https://fly.io/blog/introducing-litefs/) to sync the SQLite in a somewhat more "database-aware" manner. But in my understanding, it wouldn't even have worked conceptually, as the LTX files used by LiteFS operate on individual SQLite pages, which, I thought, would be one level too "low". There wouldn't be a way to sensibly "merge" those in case of multiple writers.
+
+Last, I ended up with this "high-level" approach of using what OpenCode provides through it's REST API, which, I think, is cleanest.
