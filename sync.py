@@ -9,6 +9,8 @@ from state import load_state, save_state
 
 log = logging.getLogger('opencode-sess-sync')
 
+TOLERANCE_MS = 1000
+
 
 @dataclass
 class Plan:
@@ -72,8 +74,8 @@ def build_plan(local: dict, hub: dict, state: dict, active: dict) -> Plan:
 
         if local_session and hub_session:
             if known_local is not None and known_hub is not None:
-                local_changed = local_updated > known_local
-                hub_changed = hub_updated > known_hub
+                local_changed = local_updated > known_local + TOLERANCE_MS
+                hub_changed = hub_updated > known_hub + TOLERANCE_MS
 
                 if local_changed and hub_changed:
                     conflicts.add(sid)
@@ -90,7 +92,7 @@ def build_plan(local: dict, hub: dict, state: dict, active: dict) -> Plan:
                         pull.add(sid)
                 else:
                     entries[sid] = {'local': local_updated, 'hub': hub_updated}
-            elif local_updated == hub_updated:
+            elif abs(local_updated - hub_updated) <= TOLERANCE_MS:
                 entries[sid] = {'local': local_updated, 'hub': hub_updated}
             elif sid in busy:
                 entries[sid] = {'local': local_updated, 'hub': hub_updated}
